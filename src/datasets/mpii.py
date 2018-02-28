@@ -1,3 +1,4 @@
+#coding:utf-8
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -48,17 +49,22 @@ def get_split(split_name, dataset_dir, file_pattern=None, reader=None):
   if split_name not in SPLITS_TO_SIZES:
     raise ValueError('split name %s was not recognized.' % split_name)
 
+  # file_pattern在读本数据集时是 mpii_%s_*.tfrecord
   if not file_pattern:
     file_pattern = _FILE_PATTERN
-  file_pattern = os.path.join(dataset_dir, file_pattern % split_name)
+  file_pattern = os.path.join(dataset_dir, file_pattern % split_name) # 数据集全路径
+  # 对符合file_pattern要求的文件做了一个排序，并以列表形式返回，名字依旧是file_pattern
   # The following is important to ensure the files are read in order, because
   # otherwise test time output can be generated in any random order
   file_pattern = _tfrecord_file_pattern_to_list(file_pattern)
-
+  
+  # 指定reader使用tf.TFRecordReader
   # Allowing None in the signature so that dataset_factory can use the default.
   if reader is None:
     reader = tf.TFRecordReader
 
+  # 定义解码器
+  # 提供解析格式
   keys_to_features = {
       'image/encoded': tf.FixedLenFeature((), tf.string, default_value=''),
       'image/format': tf.FixedLenFeature((), tf.string, default_value='png'),
@@ -84,6 +90,7 @@ def get_split(split_name, dataset_dir, file_pattern=None, reader=None):
 
   labels_to_names = None
 
+  # 创建Dataset对象并返回
   return slim.dataset.Dataset(
       data_sources=file_pattern,
       reader=reader,
@@ -91,4 +98,4 @@ def get_split(split_name, dataset_dir, file_pattern=None, reader=None):
       num_samples=SPLITS_TO_SIZES[split_name],
       items_to_descriptions=_ITEMS_TO_DESCRIPTIONS,
       num_classes=_NUM_CLASSES,
-      labels_to_names=labels_to_names), _NUM_POSE_KEYPOINTS
+      labels_to_names=labels_to_names), _NUM_POSE_KEYPOINTS #同时返回 _NUM_POSE_KEYPOINTS，其值为16，表示16个关节点

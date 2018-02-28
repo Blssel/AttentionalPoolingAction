@@ -9,7 +9,7 @@ ROOT_PATH = os.path.dirname(cur_path)
 
 # add any new ops under the following
 pose_to_heatmap_fn = tf.load_op_library(
-  os.path.join(ROOT_PATH, 'pose_to_heatmap.so')).pose_to_heatmap
+  os.path.join(ROOT_PATH, 'pose_to_heatmap.so')).pose_to_heatmap  #加载操作，载入动态链接文件pose_to_heatmap.so
 zero_out_channels_fn = tf.load_op_library(
   os.path.join(ROOT_PATH, 'zero_out_channels.so')).zero_out_channels
 render_pose_fn = tf.load_op_library(

@@ -1,3 +1,6 @@
+
+# coding:utf-8
+
 """Provides data for the HMDB51 dataset.
 """
 

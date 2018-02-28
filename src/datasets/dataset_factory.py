@@ -1,3 +1,5 @@
+# coding:utf-8
+
 """A factory-pattern class which returns classification image/label pairs."""
 
 from __future__ import absolute_import
@@ -18,7 +20,7 @@ datasets_map = {
   'jhmdb21': jhmdb21
 }
 
-
+# 根据
 def get_dataset(name, split_name, dataset_dir, file_pattern=None, reader=None,
                 **kwargs):  # added by rgirdhar: allow other options
   """Given a dataset name and a split_name returns a Dataset.

@@ -10,7 +10,7 @@ def gen_losses(
   with tf.name_scope('LossFn'):
     if loss_type_pose and logits_pose.get_shape().as_list()[-1] > 0:
       with tf.name_scope('PoseLoss'):
-        # Loss over the pose
+        # Loss over the pose   计算pose的loss
         if labels_pose.get_shape().as_list() != \
            logits_pose.get_shape().as_list():
           tf.logging.info('Sizes of logits {} and labels {} are different. '
@@ -71,7 +71,7 @@ def gen_losses(
 
     with tf.name_scope('ActionLoss'):
       # TODO (rgirdhar): Add the option of having -1 label, so ignore that one
-      if loss_type_action == 'softmax-xentropy':
+      if loss_type_action == 'softmax-xentropy':  # 如果采用交叉熵loss
         tf.losses.softmax_cross_entropy(
           onehot_labels=slim.one_hot_encoding(
             labels_action,

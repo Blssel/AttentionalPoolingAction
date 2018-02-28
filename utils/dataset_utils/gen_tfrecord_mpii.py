@@ -161,12 +161,13 @@ def _get_action_class(cname, D, act_id):
 
 
 def main():
+  # 加载MPII的.mat注释文件
   T = scipy.io.loadmat(_MPII_MAT_FILE, squeeze_me=True,
                        struct_as_record=False)
-  annots = T['RELEASE'].annolist
-  is_train = T['RELEASE'].img_train
-  action_label = T['RELEASE'].act
-  splits = ['train', 'val', 'test']
+  annots = T['RELEASE'].annolist   # 读入对图片的注释部分
+  is_train = T['RELEASE'].img_train # training/test的分配
+  action_label = T['RELEASE'].act # 图片的activity和category标签（二者的区别是？？？？？？？？？？？）
+  splits = ['train', 'val', 'test'] 
   lists_to_write = {}
   img_id_in_split = {}
   all_imnames = []

@@ -1,3 +1,4 @@
+# coding:utf-8
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -15,7 +16,7 @@ from tensorflow.python.ops import control_flow_ops
 from tensorflow.python.client import timeline
 from datasets import dataset_factory
 sys.path.append('../models/slim')
-from deployment import model_deploy
+from deployment import model_deploy # 这说明模块名只要在搜索路径中就行了
 from nets import nets_factory
 from preprocessing import preprocessing_factory
 
@@ -292,27 +293,26 @@ def parse_args():
   args = parser.parse_args()
   return args
 
-
 def main():
   args = parse_args()
   if args.cfg_file is not None:
-    cfg_from_file(args.cfg_file)
+    cfg_from_file(args.cfg_file) # cfg_from_file在config模块中，功能是：用yaml中的配置更新默认配置(默认配置在config模块之，已从该模块导入cfg ，cfg就保存着默认配置)，以适应不同任务的需求，无返回值，直接结果就是默认配置被更新了。 from config import cfg, cfg_from_file, cfg_from_list, get_output_dir 
 
   tf.logging.info('Using Config:')
-  pprint.pprint(cfg)
+  pprint.pprint(cfg) # 美观打印
 
   train_dir = get_output_dir('default' if args.cfg_file is None
                              else args.cfg_file)
-  os.environ['CUDA_VISIBLE_DEVICES'] = cfg.GPUS
-  num_clones = len(cfg.GPUS.split(','))
+  os.environ['CUDA_VISIBLE_DEVICES'] = cfg.GPUS  #指定GPU !!!!需要修改
+  num_clones = len(cfg.GPUS.split(',')) # 并行数
 
-  tf.logging.set_verbosity(tf.logging.INFO)
-  with tf.Graph().as_default():
+  tf.logging.set_verbosity(tf.logging.INFO)  # 设置日志显示级别为INFO
+  with tf.Graph().as_default():  # 设置一个默认图
     ######################
     # Config model_deploy#
     ######################
     tf.set_random_seed(cfg.RNG_SEED)
-    deploy_config = model_deploy.DeploymentConfig(
+    deploy_config = model_deploy.DeploymentConfig(  # 该类在model_deploy模块第481行，
         num_clones=num_clones,
         clone_on_cpu=False,
         replica_id=0,
@@ -323,26 +323,32 @@ def main():
     with tf.device(deploy_config.variables_device()):
       global_step = slim.create_global_step()
 
-    ######################
+    '''
     # Select the dataset #
-    ######################
+    '''
     kwargs = {}
     if cfg.TRAIN.VIDEO_FRAMES_PER_VIDEO > 1:
-      kwargs['num_samples'] = cfg.TRAIN.VIDEO_FRAMES_PER_VIDEO
-      kwargs['randomFromSegmentStyle'] = cfg.TRAIN.READ_SEGMENT_STYLE
-      kwargs['modality'] = cfg.INPUT.VIDEO.MODALITY
-      kwargs['split_id'] = cfg.INPUT.SPLIT_ID
-    if cfg.DATASET_LIST_DIR != '':
-      kwargs['dataset_list_dir'] = cfg.DATASET_LIST_DIR
-    if cfg.INPUT_FILE_STYLE_LABEL != '':
+      kwargs['num_samples'] = cfg.TRAIN.VIDEO_FRAMES_PER_VIDEO         # 每个视频中的采样帧数
+      kwargs['randomFromSegmentStyle'] = cfg.TRAIN.READ_SEGMENT_STYLE  # 是否采用随机采样风格：
+      kwargs['modality'] = cfg.INPUT.VIDEO.MODALITY                    # 输入模态：默认为rgb
+      kwargs['split_id'] = cfg.INPUT.SPLIT_ID                          # 第几个SPLIT：默认为1
+    if cfg.DATASET_LIST_DIR != '':                                     
+      kwargs['dataset_list_dir'] = cfg.DATASET_LIST_DIR                # ?????????
+    if cfg.INPUT_FILE_STYLE_LABEL != '':                               # ????????
       kwargs['input_file_style_label'] = cfg.INPUT_FILE_STYLE_LABEL
-    dataset, num_pose_keypoints = dataset_factory.get_dataset(
+    # 目的是返回一个Dataset对象和num_pose_keypoints
+    # 参数：数据集名称DATASET_NAME:默认为mpii
+    #       DATASET_SPLIT_NAME:默认为：trainval_train
+    #       DATASET_DIR:默认为data/mpii/mpii_tfrecords
+    #       kwargs
+    dataset, num_pose_keypoints = dataset_factory.get_dataset(            # from datasets import dataset_factory
       cfg.DATASET_NAME, cfg.TRAIN.DATASET_SPLIT_NAME, cfg.DATASET_DIR,
       **kwargs)
 
-    ####################
+    '''
     # Select the network #
-    ####################
+    '''
+    # get_network_fn这个函数，会根据要求返回一个对应模型的接口函数fun，fun函数可以接受图片参数，返回对应输出
     network_fn = nets_factory.get_network_fn(
         cfg.MODEL_NAME,
         num_classes=(dataset.num_classes),
@@ -354,6 +360,7 @@ def main():
     #####################################
     # Select the preprocessing function #
     #####################################
+    # 预处理函数名
     preprocessing_name = cfg.MODEL_NAME
     image_preprocessing_fn = preprocessing_factory.get_preprocessing(
         preprocessing_name,
@@ -383,6 +390,7 @@ def main():
           batch_size=cfg.TRAIN.BATCH_SIZE,
           num_threads=cfg.NUM_PREPROCESSING_THREADS,
           capacity=5 * cfg.TRAIN.BATCH_SIZE)
+      # batch_queue应该是batch队列，
       batch_queue = slim.prefetch_queue.prefetch_queue(
         [images, pose_labels_hmap, pose_labels_valid, action_labels],
         capacity=5 * deploy_config.num_clones * cfg.TRAIN.ITER_SIZE)
@@ -392,10 +400,12 @@ def main():
     ####################
     def clone_fn(batch_queue):
       """Allows data parallelism by creating multiple clones of network_fn."""
+      # 出队，图片，和3个标签
       images, labels_pose, labels_pose_valid, labels_action = batch_queue.dequeue()
       # due to the multi-frame/video thing, need to squeeze first 2 dimensions
       labels_pose = tf.concat(tf.unstack(labels_pose), axis=0)
       labels_pose_valid = tf.concat(tf.unstack(labels_pose_valid), axis=0)
+      # 输入
       logits, end_points = network_fn(images)
       pose_logits = end_points['PoseLogits']
 
@@ -413,33 +423,35 @@ def main():
       end_points['ActionLabels'] = labels_action
       end_points['ActionLogits'] = logits
       tf.logging.info('PoseLogits shape is {}.'.format(pose_logits.get_shape().as_list()))
-
+      # 生成loss
       gen_losses(labels_action, logits, cfg.TRAIN.LOSS_FN_ACTION,
                  dataset.num_classes, cfg.TRAIN.LOSS_FN_ACTION_WT,
                  labels_pose, pose_logits, cfg.TRAIN.LOSS_FN_POSE,
                  labels_pose_valid, cfg.TRAIN.LOSS_FN_POSE_WT, end_points, cfg)
-
+      # 返回
       return end_points
 
     # Gather initial summaries.
     summaries = set(tf.get_collection(tf.GraphKeys.SUMMARIES))
-
+    
+    # 创建clone
     clones = model_deploy.create_clones(deploy_config, clone_fn, [batch_queue])
-    first_clone_scope = deploy_config.clone_scope(0)
+    first_clone_scope = deploy_config.clone_scope(0)  # 该方法根据参数生成对应字符串，表示一个name_scope名
     # Gather update_ops from the first clone. These contain, for example,
     # the updates for the batch_norm variables created by network_fn.
-    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS, first_clone_scope)
+    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS, first_clone_scope) #获取UPDATE_OPS集合中命名匹配first_clone_scope的更新操作（注意是操作）
 
     # Add summaries for end_points.
-    end_points = clones[0].outputs
+    end_points = clones[0].outputs #????应该是获取第0个clone的输出 
 
     # store the end points in a global variable for debugging in train_step
     global end_points_debug
     end_points_debug = end_points
 
+    # 为每一个end_point节点加入监控
     for end_point in end_points:
       x = end_points[end_point]
-      summaries.add(tf.summary.histogram('activations/' + end_point, x))
+      summaries.add(tf.summary.histogram('activations/' + end_point, x)) #往summaries集合中增加监控
       # summaries.add(tf.summary.scalar(tf.nn.zero_fraction(x),
       #                                 name='sparsity/' + end_point))
     sum_img = tf.concat(tf.unstack(end_points['Images']), axis=0)

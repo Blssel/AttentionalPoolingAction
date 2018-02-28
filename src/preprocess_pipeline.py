@@ -56,7 +56,7 @@ def _get_other_items(provider, stuff, existing_items, new_items):
 
 
 def get_input(provider, cfg, items):
-  stuff = provider.get(items)
+  stuff = provider.get(items) #读取一组数据
   if 'image' in items:
     img_pos = items.index('image')
     image = stuff[img_pos]
